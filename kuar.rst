@@ -16,6 +16,11 @@ https://github.com/kubernetes-up-and-running
 https://github.com/dkoleary/kuarb_docs
   Personal repo for book notes.
 
+https://phoenixnap.com/kb/how-to-install-kubernetes-on-centos
+  Kubernetes installation process on centos 7
+
+https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/
+  Deploying the webui for kubernetes.  
 Commands:
 =========
 
@@ -28,6 +33,31 @@ docker build -t ${name} .
 docker run --rm ...
   --rm arg automatically removes the container when it exits...
   no having to run a second command.
+
+docker system prun:
+  General cleanup; removes stopped containers, dangling images, etc
+
+eksctl create --name ${name}
+  Creates an eks cluster (amazon) 
+
+aws eks --region us-east-2 update-kubeconfig --name kuar-cluster
+  Displays the kubeconfig file for an eks cluster
+
+kubectl get svc
+  Displays generic info about the cluster::
+
+    $ kubectl get svc
+    NAME         TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)   AGE
+    kubernetes   ClusterIP   10.100.0.1   <none>        443/TCP   19m
+
+kubectl get nodes
+  Dislays worker node status
+
+kubectl describe nodes ${node_name}
+  Displays detailed information about the node.  
+
+kubectl get daemonsets --namespace=kube-system kube-proxy 
+  Displays proxy status.
 
 Questions:
 ==========
@@ -105,6 +135,58 @@ Chapter 2:
       $ docker tag kuard dougoleary/kuard-amd64:blue
       $ docker push dougoleary/kuard-amd64:blue
 
+Chapter 3:
+----------
+
+Book uses cloud based kubernetes cluster which, ok... will work for learning how to
+interact with the cluster; however, I was also looking for detials on installing 
+one.  I think I found a cluster and will be trying it out on AWS at some point.  
+
+I'll keep usinng the AWS cluster - just have to remember to delete it.  $0.10/hour,
+$2,40/day, $36/month.  not bad, not great for doing this on the cheap.
+
+I did kick off the commmand to create a cluster.  This takes a fair bit of time.
+If this is going to take this long through the cloud, I hesitate to think what 
+it'll be like on a couple of vms.
+
+interesting.  the create command took *a long* time to finish.  When it did, 
+no kubeconfig was presented.  In ordert to manage the cluster, I need to 
+export KUBECONFIG=~/.kube/config
+
+That file gets created by an aws command - also not discussed in the book.
+
+So, the complete process is::
+
+  eksctl create --name ${name}
+  aws eks --region us-east-2 update-kubeconfig --name kuar-cluster
+
+aws command dumps the config to stdout which can then be copied or redirected
+to the config file.
+
+Cluster components:
+
+* kubernetes proxy: responsible for routing internal traffic between nodes.  
+  must be running on all nodes of a cluster::
+
+    $ kubectl get daemonsets --namespace=kube-system kube-proxy
+    NAME         DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+    kube-proxy   2         2         2       2            2           <none>          31m
+
+  Default name for the proxy api is daemonsets. (Book uses cap S); however,
+  that can be changed.
+
+* kubernetes DNS: handles naming and service discovery.  Book says the name
+  is core-dns.  EKS has it as coredns (no dash)::
+
+    $ kubectl get deployments --namespace=kube-system  coredns
+    NAME      READY   UP-TO-DATE   AVAILABLE   AGE
+    coredns   2/2     2            2           37m
+
+* kubernetes UI:  apparently, there's a dashboard... but, it's not installed
+  on eks by default.  Execute::
+
+    kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml
+
 
 To-dos:
 =======
@@ -112,4 +194,4 @@ To-dos:
 * Figure out docker credential store: 
   https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 
-
+* Figure out how to get the webui thingie working.
