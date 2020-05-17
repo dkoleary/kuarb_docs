@@ -40,6 +40,9 @@ docker system prun:
 eksctl create --name ${name}
   Creates an eks cluster (amazon) 
 
+eksctl delete cluster --name kuar-cluster
+  Deletes the cluster
+
 aws eks --region us-east-2 update-kubeconfig --name kuar-cluster
   Displays the kubeconfig file for an eks cluster
 
@@ -68,8 +71,8 @@ Questions:
 Notes:
 ======
 
-Chapter 1:
-----------
+Chapter 1: General overview
+---------------------------
 
 Mainly an overview of why kubernetes and containers are so great.
 
@@ -86,8 +89,8 @@ Reasons:
   to manage/work in larger number of systems, projects, etc.
 * Efficiency
 
-Chapter 2:
-----------
+Chapter 2: Containers
+---------------------
 
 * Starts by building a nodejs app.  To support this, I:
 
@@ -135,8 +138,8 @@ Chapter 2:
       $ docker tag kuard dougoleary/kuard-amd64:blue
       $ docker push dougoleary/kuard-amd64:blue
 
-Chapter 3:
-----------
+Chapter 3: Starting kubernetes
+------------------------------
 
 Book uses cloud based kubernetes cluster which, ok... will work for learning how to
 interact with the cluster; however, I was also looking for detials on installing 
@@ -187,6 +190,129 @@ Cluster components:
 
     kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.0.0/aio/deploy/recommended.yaml
 
+(05/17/20)
+
+
+Chapter 4: General kubectl commannds
+------------------------------------
+
+Before getting into ch4, I'm working through the help for eksctl.  
+Interestingly enough, it will auto-generatre the ~/.kube/config ... assuming
+~/.kube exists?  Going to check on that in a bit.
+
+Timing:
+
+  * Started:  clustr generation at 1058 CST.
+  * Initial display on aws console: ~1101 CST.
+  * Console says ready at: 1115 CST.  Still waitinng on nodes to be ready
+
+General kubectl commands:
+
+* Namespaces: basically a folder for a set of objects.  Everything in a 
+  kubernetes cluster is in a namespace.  The default name space is *default*.
+  Options to modify the name space::
+
+    kubectl --namespace ${ns}
+    kubectl --all-namespaces
+
+* Contexts:  Can be used to change the default namespace (and other things,
+  I imagine) permanently.  Gets stored in the ~/.kube/config.  Optionw::
+
+    # to create a context
+    kubectl config set-context my-context --namespace=mystuff
+    # to start using the context:
+    kubectl config use-context my-context
+    # manage different users/clusters
+    kubectl config set-context ... --clusters | --users
+
+* Viewing kubernetes objects:
+
+  * Everything is an API; in fact, kubectl only executes http requests to 
+    the approrpiate urls.  
+
+  * kubectl get::
+
+      kubectl get ${resourcename} # generic; lists all recourses in namespace
+      kubectl get ${rn} ${ojbect} # get info on specifc object
+
+  * kubectl describe ${rn} ${obj}:  dumps a shit load of data about the object
+
+* Creating/updating/destroying objects:
+
+  * All done through yaml files via ``kubectl apply -f ${yaml}``
+  * kubectl has a --dry-run flag.
+  * ``kubectl edit``  # downloads the yaml, allows you to edit, then uploads
+    when done.
+  * History of edits of objects are viewable via::
+
+      kubectl apply -f ${yaml} view-last-applied
+
+  * ``kubectl delete ${rn} ${obj}``
+
+* Labels/Tags::
+
+    kubectl [ label|annotate] ${rn} ${obj} ${key}=${value} [--overwrite]]
+    kubectl [ label|annotate| ${rn} ${obj}-
+
+* Logs::
+
+    kubectl logs ${pod}  # display logs for single container pod
+    kubectl logs ${pod} -c ${container-id}
+    kubectl logs ${pod}} -t # k-version of tail -f
+    
+* Other commands
+
+  * Copy files to/f container: ``kubectl cp ...``
+  * Execute command in pod: ``kubectl exec -it ${pod}...``
+  * Open another port in pod:  ``kubectl port-forward ${pod} 8080:80``
+  * Display resources: ``kubectl top [ nodes | pods ]``
+
+Chapter 5: Pods
+---------------
+
+* Topic of colocating multiple apps on a single worker node - which, as it
+  turns out, is the definition of a pod.
+
+  * Should have one app = 1 container which allows for resource limitation
+    at the container level
+  * Seems to indicate a pod runs on one and only one node.
+  * And, just confirmed.  pods are the smallest deployable artifact and
+    always land on one system.
+  * pods share namespaces, networking, and can communicte via native
+    interprocess comms channels
+  * containers in different pods share nothing even if on the same host.  IOW:
+    containers in different pods on the same node might as well be on different
+    worker nodes.
+  * To pod or not to pod: the question is "Will these two apps work correctly
+    if they land on different worker nodes?"  If no, one pod, if yes, 
+    different pods.
+  * Once on a node, pods don't move.  How to migrate a pod?  stop/start?
+
+* Creating a pod::
+
+    kubectl run --image=${image}
+
+  I didn't have to specify dockerhub.  just *dougoleary/kuard-amd64* which
+  implies the cluster has a registry search configured somewhere.
+
+  I also didn't specify a name space so.. this is in *default*?  Yep, sure
+  enough::
+
+    $ kubectl get pods --all-namespaces
+    NAMESPACE     NAME                       READY   STATUS    RESTARTS   AGE
+    default       kuard                      1/1     Running   0          2m26s
+    kube-system   aws-node-p5js8             1/1     Running   0          49m
+    kube-system   aws-node-xcd5s             1/1     Running   0          48m
+    kube-system   coredns-5fb4bd6df8-7jllj   1/1     Running   0          55m
+    kube-system   coredns-5fb4bd6df8-gl9w6   1/1     Running   0          55m
+    kube-system   kube-proxy-8m8wb           1/1     Running   0          49m
+    kube-system   kube-proxy-qkc65           1/1     Running   0          48m
+
+* Deleting pods::
+
+    kubectl delete pods/kuard
+
+* pod manifest:
 
 To-dos:
 =======
@@ -195,3 +321,4 @@ To-dos:
   https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 
 * Figure out how to get the webui thingie working.
+* Figure out how to configure registry searches.
