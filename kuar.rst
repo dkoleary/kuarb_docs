@@ -290,7 +290,7 @@ Chapter 5: Pods
 
 * Creating a pod::
 
-    kubectl run --image=${image}
+    kubectl run kuard --image=${image}
 
   I didn't have to specify dockerhub.  just *dougoleary/kuard-amd64* which
   implies the cluster has a registry search configured somewhere.
@@ -312,7 +312,142 @@ Chapter 5: Pods
 
     kubectl delete pods/kuard
 
+05/19/20:
+
+* Starting kuar-cluster:
+
+  * Started: 1003
+  * Full command back: 1021
+
 * pod manifest:
+
+  * Key fields/attributes:
+
+    * metadata section - at least the name of the pod.
+    * spec section:  details the container, storge, etc.  
+
+  * After creating the pod manifest, run it via ``kubectl apply -f ${yaml}``
+    NOTE: if the image doesn't have a latest, need to specify a tag in the
+    image line of the manifest.
+
+  * Starting pods::
+
+      kubectl run ${name} --image=${image}
+      kubectl apply -f ${manifest}
+
+  * Stopping pods::
+
+      kubectl delete pods ${name}
+      kubectl delete -f ${manifest}
+
+    Terminated pods have a grace period of (default) 30 seconds.  IOW: pods
+    don't die immediately.
+
+  * port forwarding: creates a tunnel between local system (from which kubectl
+    is being run) to the pod.  The port forwarding works like ssh in that 
+    the command blocks until <ctrl-c> at which point the port is no longer 
+    forwarded::
+
+      kubectl port-forward kuard 8080:8080
+      # then can curl http://localhost:8080
+
+    Nothing in a ``kubectl describe`` command indicates that there's a 
+    forwarded port.
+
+  * logs: ``kubectl logs ${pod}``
+
+  * Accessing pods::
+
+      kubectl exec ${pod} ${cmd} # similar to remote ssh command
+      kubectl exec -it ${pod} /bin/bash # remote login
+
+  * Copying files via kubectl::
+
+      # from pod:
+      kubectl cp ${pod}:/${dir} ${tgt}
+      # to pod:
+      kubectl cp ${src} ${pod}:/${dir}/${tgt}
+
+    And, I quote for Suresh::
+
+      Generally speaking, copying files intoa  container is an anti-pattern.
+      You really should treat the contents of a container as immutable.
+      But, occasionally, it's the most immediate way to stop the bleeding 
+      and restore your service to health, since it is quicker than building,
+      pushing, and rolling out a new image.  Once the bleedinng is stopped,
+      however, it is critically important that you immediately go and do the
+      image build and rollout, or you are guaranteed to forget the local 
+      change that you made to your container and overwrite it in the subsequent
+      regularly scheduled rollout.
+
+* Health checks:  
+
+  * kubernetes runs generic health check that ensures the
+    main process of the pod/container is running.  If it isn't, kubernetes
+    will restart it.  
+  * Doesn't tell if a process is hung or otherwise non-responsive.
+  * *liveness probes*:  Logic to verify the application is doing what it's
+    supposed to be doing.  Since these checks are app specific, they have to
+    be defined in the manifest.
+
+    * Example::
+
+        [[snip]]
+        spec:
+          containers:
+            - image: dougoleary/kuard-amd64:blue
+              name: kuard
+              livenessProbe:
+                httpGet:
+                  path: /healthy
+                  port: 8080
+                initialDelaySeconds: 5
+                timeoutSeconds: 1
+                periodSeconds: 10
+                failureThreshold: 3
+              ports:
+              [[snip]]
+
+    * Definition: Creates an httpGet probe which checks the /healthy end 
+      point on port 8080.  It won't be called for 5 seconds (initialDelay)
+      after all containers of the pod are active.  The probe must repond
+      within 1 second (timeoutSeconds).  the probe will be called every 10
+      seconds (periodSeconds) and, if three or more consecutive probes 
+      (failureThreshold) fail, the container/pod fails/restarts.
+
+    * interesting that I can't define that and push to a live container.
+ 
+  * Readiness probe: very similar to liveness check; however, failure will
+    result in removal from load balancer.  liveness check failures result 
+    in pod restart.
+
+* Resource management:
+
+  * Misc:
+
+    * Resources requested per container not per pod. 
+    * Pod resources are combination of all subordinate containers.
+    * Resource metrics need some investigation.  *500m* somehow translates
+      to half a core.
+
+  * Requests:  min amount of a resource required to start a pod.  
+  * Limits: max amount of a resource a pod can consume.
+    
+* Persistent volumes: mostly discussed in chapter 15.
+
+  * new stanzas:
+
+    * volumes (in the spec stanza).  Defines volumes that the pod *can* mount.
+    * volumeMounts in container sectoin: defines what the container mounts.
+
+  * Volume types:
+
+    * comms/synchornization:  emptyDir, scoped to a pod's lifecycle.  
+    * cache:  valuable for performance but not required for correct operation 
+      of an application.
+    * Persistent data:  truly persistent data.
+    * Mounting host filesystems: actually using host's filesystems.  book uses
+      /dev as an example.  hostpath
 
 To-dos:
 =======
