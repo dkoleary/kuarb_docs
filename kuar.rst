@@ -21,6 +21,10 @@ https://phoenixnap.com/kb/how-to-install-kubernetes-on-centos
 
 https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/
   Deploying the webui for kubernetes.  
+
+https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
+  How to execute a deployment.
+
 Commands:
 =========
 
@@ -62,11 +66,18 @@ kubectl describe nodes ${node_name}
 kubectl get daemonsets --namespace=kube-system kube-proxy 
   Displays proxy status.
 
+kubectl delete pods --all --namespace=default
+  Deletes all pods in a namespace.  Should probably use this somewhat
+  judiciously.
+
 Questions:
 ==========
 
 * How to remove files from lower layers?  Somehow have to 'delayer' 
   or flatten the image...
+* How to limit, at a cluster level, sources for persistent storage?
+* (answerd) What is difference between pod and deployment?  pods are 1 or more 
+  containers, deployments are 1 or more duplicate pods.  
 
 Notes:
 ======
@@ -141,12 +152,14 @@ Chapter 2: Containers
 Chapter 3: Starting kubernetes
 ------------------------------
 
-Book uses cloud based kubernetes cluster which, ok... will work for learning how to
-interact with the cluster; however, I was also looking for detials on installing 
-one.  I think I found a cluster and will be trying it out on AWS at some point.  
+Book uses cloud based kubernetes cluster which, ok... will work for learning 
+how to interact with the cluster; however, I was also looking for detials on 
+installing one.  I think I found a cluster and will be trying it out on AWS 
+at some point.  
 
-I'll keep usinng the AWS cluster - just have to remember to delete it.  $0.10/hour,
-$2,40/day, $36/month.  not bad, not great for doing this on the cheap.
+I'll keep usinng the AWS cluster - just have to remember to delete it.  
+$0.10/hour, $2,40/day, $36/month.  not bad, not great for doing this on 
+the cheap.
 
 I did kick off the commmand to create a cluster.  This takes a fair bit of time.
 If this is going to take this long through the cloud, I hesitate to think what 
@@ -448,6 +461,128 @@ Chapter 5: Pods
     * Persistent data:  truly persistent data.
     * Mounting host filesystems: actually using host's filesystems.  book uses
       /dev as an example.  hostpath
+
+05/20/20:
+
+Chapter 6: labels and annotations
+---------------------------------
+
+Definition:
+
+  * labels: key/value pairs that can be attached to kubernetes objects.
+    They are arbitrary and are useful for attaching identifying information
+    to objects
+  * Annotations: key/value pairs that hold non-identifying information that
+    can be leveraged by tools and libraries.
+
+The book promises that the distinction will become clear.
+
+Labels:
+~~~~~~~
+
+* label format:
+
+  * Key: [ prefix ] / name
+
+    * Prefix is optional; but, if supplied, must be a DNS subdomain.
+    * Names:
+
+      * < 63 chars long
+      * start and end with alphanumeric
+      * can use [ -_. ]
+
+  * Value: a string - even if the string is a number.
+
+* Running through the example in the book; got 4 pods running.  
+  ``kubectl get deployments`` doesn't show anything though... 
+  What is the difference?  (answered).  Also explains why kubectl is 
+  bitching about the replicas.  Doesn't look like there's a way to run 
+  a deployment outside of a yaml file.  
+
+  * pods: defined already - one or more containers
+  * deployment: maintains a set of replicated pods.
+
+* Outside of replacing deployments with pods, examples in the book are good.
+
+  * --show-labels
+  * --L ${label} = make ${label} a column::
+
+      $ kubectl get pods -L canary
+      NAME                READY   STATUS    RESTARTS   AGE   CANARY
+      alpaca-prod         1/1     Running   0          17m   
+      alpaca-test         1/1     Running   0          16m   true
+      bandicoot-prod      1/1     Running   0          15m   
+      bandicoot-staging   1/1     Running   0          14m   
+
+  * Remove a label: ``kubectl label pods ${name} "${label}-"`` 
+  * Filtering::
+
+      --selector="${key}=${val}"  Filters search by the labels.
+
+    Can also use pythonic syntax::
+
+      --selector="app in (alpaca, bandicoot)"
+
+    Can also use pythonic syntax::
+
+      --selector="app in (alpaca, bandicoot)"
+
+Annotations:
+~~~~~~~~~~~~
+
+* Stores metadata about kubernetes objectss with the sole purpose
+  of assisting tools and libraries.  Book describes them as 'opaque'
+
+* Used for:
+
+  * Keep track of a reason for the latest update to an object.
+  * Communicate a schedule to a specialized scheduler
+  * Extend data about what tool made the last change.
+  * Attach build, release, or image info not appropriate for labels.
+    Examples given: git has, timestamps, or PR number.
+  * Enable deployments to keep track of the replica sets.
+  * Provide extra data to enhance visual quality or usability of a UI.
+  * Prototype alpha functionality in kubernetes.
+
+* Best use case: rolling deployments.  
+* Format: keys use the same format as labels, values is a free form string 
+  field.  Can store things like json docs.  since it's free form, probably
+  unsearchable.
+
+Chapter 7: service discovery
+----------------------------
+
+* Problem statement: kubernetes is dynamic.  People can and do create 
+  lots of things.  How to find and distinguise these 'lots of things'?
+
+  Service discovery is the general name for the problem and solutions.
+
+* Discussion of issues with traditional DNS.
+* More kubectl with replicas.  doesn't work with ``kubecctl run``  I tried
+  hacking a deployment yaml file but apparently need more info. I did finnally
+  find ``kubectl create deployment``.  Unfortunately, that doesn't quite work
+  either.  Still going with the pods, for now.
+* Looks like that's going to be a problem.  Doesn't seem like I can expose
+  a pod.. Never mind, you can::
+
+    $ kubectl expose pods alpaca-prod --port=8080
+    service/alpaca-prod exposed
+    $ kubectl get services -o wide
+    NAME          TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE    SELECTOR
+    alpaca-prod   ClusterIP   10.100.128.242   <none>        8080/TCP   13s    app=alpaca,env=prod,ver=1
+    kubernetes    ClusterIP   10.100.0.1       <none>        443/TCP    122m   <none>
+
+  * type=NodePorts: exposing apps to the internet.  
+  * type=Loadbalancer: creates a load balancer in cloud envs.
+  * Manually identify services via ip assocaited with the pods, then add the
+    nodeport
+  * kubeproxy: 
+  * May need to re-do this chapter after I go through deployments.  Aother 
+    probable issue is that I don't think my kube cluster is internet 
+    accessible.
+
+Chapter 8: load balancing with ingress
+--------------------------------------
 
 To-dos:
 =======
