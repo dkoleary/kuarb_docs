@@ -25,6 +25,9 @@ https://kubernetes.io/docs/tasks/access-application-cluster/web-ui-dashboard/
 https://kubernetes.io/docs/concepts/workloads/controllers/deployment/
   How to execute a deployment.
 
+https://kubernetes.io/docs
+  Current docs for kubernetes
+
 Commands:
 =========
 
@@ -583,6 +586,308 @@ Chapter 7: service discovery
 
 Chapter 8: load balancing with ingress
 --------------------------------------
+
+High level review of a very involved topic.  I read through the chapter.
+Ingress will require more research.
+
+Chapter 9: Replica sets
+-----------------------
+
+Replica sets duplicate pods.  reasons to replicate pods:
+
+* redundancy
+* scale
+* sharding - different replicas handling different parts or the computation
+  in parallel
+
+Reconciliation loop:
+  The loop(s) required to bring the replica set from desired state to current
+  state.
+
+Replica sets create and manage pods, they don't own them.  replicasets and pods
+have been decoupled.  Might explain why the current version of kubectl doesn't
+work as the book describes.  rapidly changing development stream.
+
+Can also add replicasets on the fly; however, book stresses that you need to 
+go back to the source yaml to ensure the change is in source control.
+
+Entertainingly, can also quarantine a pod if it's misbehaving for 
+troubleshooting purposes.
+
+Yaml presented in the book is almost certainly out of date.  Yep; according to
+the docs, replicaset's apiVersion is *app/v1*.  in the book, it's
+*extensions/v1beta1*.  
+
+Pod templates:  Define the source for the pods/containers.
+
+Stanza in the replicaset yaml file that defines selector labels, and container
+information.  I'll need to experiment more with these.
+
+Autoscaling:
+
+  Types of autoscaling:
+
+  * verticle: adding more resources (cpu, memory, etc) for individual pods/
+    containers
+  * Horizontal: Adding more pods for greater bandwidth.  Horizontal Pod
+    Autoscaling (HPA)
+
+cpu example::
+  
+  kubectl autoscale rs ${rep_name} --min=2 --max=5 --cpu-percent=80
+
+Chapter 10:  Deployments
+------------------------
+
+Going to read through this chapter as well since the book seems to be out of 
+date.  Rest of this study period will be spent trying to get a kubernetes 
+cluster running.
+
+Relationship:
+
+* Deployments: contain one or more:
+
+  * Replicasets: contains one or more:
+
+    * pods:  contain one or more:
+
+      * containers: 
+      * services:
+
+Relationship is defined by labels and a selector label
+
+If manually scale a deployment's replicaset, kubernetes will revert it.
+The definition is set at the deployment level, not the replicaset 
+level.
+
+
+Deployment spec similr to replicaset spec.  Deployments add a strategy 
+object::
+
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+
+Strategy types:
+
+* RollingUpdate:  more robust and user friendly; however, adds potential
+  for race conditions between versions as both will be running simultaneously.
+
+  * maxunavailable: how many pods can be out of commisison at once.  
+    maxunavailable=0% = recreate strategy.
+  * maxSurge: how many additional pods/resources, etc, can be created to 
+    accomplish the rolling update
+
+* Recreate:  Basically, blasts all current pods. kubernetes recreates with 
+  updated image.  Easier and more straight forwawrd but some downtime.
+
+Updating deployments:
+
+* Scaling:  Update the yaml file to incrase/decrease replicas; kubernetes
+  handles the rest.
+* Updating container image: 
+
+  * Update image line as needed.
+  * Add annotation stanza in the template's metadata section
+
+Other commands::
+
+  kubectl rollout status deployments ${name}
+  kubectl get replicasets  -o wide
+  kubectl rollout pause deployments ${name}
+  kubectl rollout resume deployments ${name}
+  kubectl rollout history deployment ${name} --revision=${num}
+
+Chapter 11: Daemonssets
+-----------------------
+
+Daemonsets schedule a single pod on all nodes of a kubernetes cluster.
+Such pods would include:
+
+* log collectors
+* monitoring agents
+
+If you want only one pod on a node, use a daemonset.
+If the pod can run multiple copies on a the same node w/o issue, use 
+replicatset.
+
+Since it's running pods, must have a template section like deployments
+and replicasets.
+
+Can use labels and node selections to limit the nodes on which the daemonset
+will run.
+
+Chapter 12: jobs
+----------------
+
+jobs are one-off processes that run until successful.  The other services
+discussed will get restarted if they terminate.  jobs are supposed to 
+terminate.  Example given: db migration.  Don't want that to keep kicking off
+but run once and only once.
+
+Main items to add to the template:
+
+* completions:  the number of jobs that need to complete?
+* parallelims: the number of simultaneously running pods.
+
+Chapter 13: configmaps and secrets
+----------------------------------
+
+Basically, kubernetes version of hiera and eyaml (puppet) or vars_files and
+ansible-vault.  
+
+Main uses for configmaps:
+
+* filesystem mounts
+* environment variables
+* command line arguments
+
+Examples in the book look very useful; however, need some way to parameterize
+the config map source.  IOW, if the pod definition is hard-coded to a specific
+config map, the pod definition will have to get updated for each environment.  
+
+I think I figured it out - you don't use parameters as part of the pod 
+definition - you use different namespaces each with their own configmaps and
+secretts.  
+
+Secrets: warning is scary: secrets are stored in the etcd storage in clear text.
+
+Secrets are exposed to pods via a *secrets volume* which must be definned in 
+the pod manifest.
+
+Chapter 14: Role based access controls
+--------------------------------------
+
+RBAC introduced in v1.5 and became generally available in v1.8
+
+Some miscellaneous data points:
+
+* Every request to kubernetes is authenticated even if it is
+  *system:unauthenticated*
+* Kubernetes does not have a built in identity store; rather, it integrates
+  with other identity sources.
+* Authorization is a combination of the user, the resource requested, and
+  the verb being used.
+
+Types of identities:
+
+* user identities = people, application accounts, etc.
+* service identities = IDs created and managed by kubernetes generally
+  associated with cluster components.
+
+Roles and role bindings by namespace and cluster:
+
+* roles/rolebinding
+
+  * Roles: define actions a specifc rol can perform::
+
+      kind: Role
+      apiVersion: rbac.authorization.k8s.io/v1
+      metadata:
+        namespace; default
+        name: pod-and-service
+      rules:
+      - apiGroups: [""]
+        resources: ['pods', 'services']
+        verbs: [ 'create', 'delete', 'get', 'list', 'patch', 'update', 'watch']
+
+  * rolebinding: As name suggests, assigns roles to users or groups::
+
+apiVersion: rback.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: default
+  name: pods-and-services  # note name of rolebinding, not name of role
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: user
+  name: alice
+- apiGroup: rbac.authorization.k8s.io
+  kind: group
+  name: mydevs
+rolref:
+  apiGroup: rbac.authorization.k8s.io
+  kind: role
+  name: pod-and-services
+
+* clusterrole/clusterrolebinding:  largely identical to above but give
+  access to the entire cluster ranther than individual name spaces.
+
+Thank god, there are built-in roles.  Having to define that crap on my own
+was going to be f'ing ugly.
+
+* cluster-admin: complete access to the entire cluster.
+* admin: complete access to the defined namespace
+* edit: allows editing in a namespace
+* view: allows views in a namespace
+
+Numerous clusterrolebindings visible via::
+
+  kubctl get clusterrolebindings
+
+Testing autorization: can-i::
+
+  kubectl auth can-i create pods
+  kubectl auth can-i get pods --subresource=logs
+
+Can manage rbac through yaml then exec::
+
+  kubectl auth reconcile -f ${yaml}.yaml [ --dry-run ]
+
+Roles can be aggregated to groups of groups so modifications to a subgroup
+will get reflected in the superset.  Not much more than a surface discussion.
+
+Fairly involved discussion of using user groups as the access mechanism.  
+no details on how to configure AD or ldap auth, though.  There was a lengthy
+list of available authetnication vehicles.
+
+Chapter 15: integrating storage solutions
+-----------------------------------------
+
+Complex apps almost always require some state.  Containers are more apt for
+stateless, but support the state apps.  This state will generally be handled
+via storage
+
+Importing external services
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Example: legacy db running that can't be migrated to kubernetes.  *Importing*
+this db into kb makes it look like the external db is part of the cluster.
+
+Running reliable singletons
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Example is a mysql db in a pod and how to expose that pod to other apps in the
+cluster
+
+Needed:
+
+* persistent volume to store the db data
+
+  * Persistent volume definition:  managed by cluster admin?  Is that how 
+    we prevent ztp from defining ad-hoc volumes?
+  * persistent volume claim
+
+* mysql pod
+* service to expose the pod.
+
+Statefulsets:
+~~~~~~~~~~~~~
+
+Apparently, the future.  Like RBAC, introduced in v1.5.  Not generally 
+available?
+
+Breezed through.  As the book is fairly dated, I imagine this topic has
+moved a bit.  I'll research more later.
+
+Summary:
+========
+
+Good book, particularly in the first few chapters.  Later chapters ended up 
+being a bit dated but did give me a good basis for further research.
+
 
 To-dos:
 =======
