@@ -5,14 +5,14 @@
   gather_facts: False
   vars:
     kec2: "/home/dkoleary/.ssh/dkoleary_aws.pem"
-    count: 1
+    count: 4
   tasks:
 
   - name: simple creation
     ec2:
       key_name: dkoleary_aws
       group: default_ssh
-      instance_type: t2.micro
+      instance_type: t2.medium
       image: ami-094720ddca649952f
       region: us-east-2
       wait: true
@@ -47,3 +47,4 @@
   gather_facts: True
   roles: 
     - common
+    - kubernetes

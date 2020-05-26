@@ -3,3 +3,4 @@ repos
 node_modules
 temp
 secrets.yml
+cache

@@ -1,0 +1,52 @@
+---
+- name: Send kubernetes.repo
+  copy:
+    src: files/kubernetes.repo
+    dest: /etc/yum.repos.d/kubernetes.repo
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install kubernetes
+  yum:
+    name: 
+      - kubelet
+      - kubeadm 
+      - kubectl
+    state: present
+
+- name: set permissive
+  selinux:
+    policy: targeted
+    state: permissive
+
+- name: ensure selinux stays that way
+  lineinfile:
+    path: /etc/selinux/config
+    regexp: '^SELINUX='
+    line: 'SELINUX=permissive'
+
+- name: remove swap from fstab
+  lineinfile:
+    path: /etc/fstab
+    regexp: '.*swap.*'
+    state: absent
+
+- name: disable swap
+  command: /usr/sbin/swapoff -a
+
+- name: load br_netfilter module
+  command: /usr/sbin/modprobe br_netfilter
+
+- name: set ipv4 bridge
+  sysctl:
+    name: net.bridge.bridge-nf-call-iptables
+    value: '1'
+    state: present
+
+- name: set ipv6 bridge
+  sysctl:
+    name: net.bridge.bridge-nf-call-ip6tables
+    value: '1'
+    state: present
+

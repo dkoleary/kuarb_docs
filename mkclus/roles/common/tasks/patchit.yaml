@@ -1,4 +1,9 @@
 ---
+- name: display patching message
+  debug:
+    msg: "Patching now.  Don't panic"
+  run_once: true
+ 
 - name: patch host
   yum:
     name: '*'
