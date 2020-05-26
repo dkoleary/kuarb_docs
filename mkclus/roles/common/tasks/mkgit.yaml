@@ -1,0 +1,37 @@
+---
+- name: install pre-requisites
+  yum:
+    name: "{{ packages }}"
+  vars:
+    packages:
+    - curl-devel
+    - expat-devel
+    - gettext-devel
+    - openssl-devel
+    - zlib-devel
+    - gcc
+    - perl-ExtUtils-MakeMaker
+
+- name: get git tarball
+  unarchive:
+    src: https://www.kernel.org/pub/software/scm/git/git-2.21.0.tar.gz
+    dest: /usr/src
+    remote_src: yes
+
+- name: make git
+  make:
+    chdir: /usr/src/git-2.21.0
+    target: all
+    params:
+      prefix=/usr/local/git
+
+- name: install git
+  make:
+    chdir: /usr/src/git-2.21.0
+    target: install
+    params:
+      prefix=/usr/local/git
+
+- name: Add path to /etc/bashrc
+  shell: echo "export PATH=/usr/local/git/bin:$PATH" >> /etc/bashrc
+

@@ -1,0 +1,10 @@
+---
+- name: patch host
+  yum:
+    name: '*'
+    state: latest
+
+- name: reboot hosts
+  reboot:
+
+

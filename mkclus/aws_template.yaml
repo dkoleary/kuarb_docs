@@ -1,0 +1,49 @@
+---
+- name: create simple instance
+  hosts: localhost
+  connection: local
+  gather_facts: False
+  vars:
+    kec2: "/home/dkoleary/.ssh/dkoleary_aws.pem"
+    count: 1
+  tasks:
+
+  - name: simple creation
+    ec2:
+      key_name: dkoleary_aws
+      group: default_ssh
+      instance_type: t2.micro
+      image: ami-094720ddca649952f
+      region: us-east-2
+      wait: true
+      count: "{{ count }}"
+    register: ec2
+
+  - debug: 
+      var: ec2.instances[0].public_ip
+
+  - name: Add instance(s) public ips to host group
+    add_host: hostname={{item.public_ip}} groups=gec2 ansible_ssh_private_key_file={{kec2}}
+    with_items: "{{ ec2.instances }}"
+
+- name: wait 4 host
+  hosts: gec2
+  remote_user: ec2-user
+  become: true
+  become_user: root
+  gather_facts: False
+  tasks:
+
+  - name: wait for it.
+    wait_for_connection:
+      delay: 60
+      timeout: 300
+
+- name: configure common items
+  hosts: gec2
+  remote_user: ec2-user
+  become: true
+  become_user: root
+  gather_facts: True
+  roles: 
+    - common

@@ -1,0 +1,124 @@
+---
+- name: create dkoleary
+  user:
+    name: dkoleary
+    comment: 'Doug OLeary'
+    groups: wheel
+    home: /home/dkoleary
+
+- name: create root/.ssh
+  file:
+    path: /root/.ssh
+    owner: root
+    group: root
+    mode: 0700
+
+- name: create dkoleary/.ssh
+  file:
+    path: /home/dkoleary/.ssh
+    state: directory
+    owner: dkoleary
+    group: dkoleary
+    mode: 0700
+
+- name: copy root key
+  copy:
+    src: dkoleary.pub
+    dest: /root/.ssh/authorized_keys
+    owner: root
+    group: root
+    mode: 0600
+
+- name: copy dkoleary key
+  copy:
+    src: dkoleary.pub
+    dest: /home/dkoleary/.ssh/authorized_keys
+    owner: dkoleary
+    group: dkoleary
+    mode: 0600
+
+- name: copy ssh_config
+  copy:
+    src: ssh_config
+    dest: /etc/ssh/ssh_config
+    owner: root
+    group: root
+    mode: 0644
+
+- name: copy sshd_config
+  copy:
+    src: sshd_config
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: 0600
+
+- name: copy sudoers
+  copy:
+    src: sudoers
+    dest: /etc/sudoers
+    owner: root
+    group: root
+    mode: 0440
+
+- name: install epel repo
+  yum:
+    name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_distribution_major_version }}.noarch.rpm
+    state: present
+
+- name: import epel gpg key
+  rpm_key:
+    key: /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-{{ ansible_distribution_major_version }}
+    state: present
+
+- name: install required tools
+  yum:
+    name: "{{ packages }}"
+  vars:
+    packages:
+    - git
+    - pssh
+    - wget
+    - bind-utils
+    - lsof 
+    - firewalld
+    - elinks
+    - xorg-x11-xauth
+    - python36
+
+- name: Enable firewalld
+  service: 
+    name: firewalld
+    state: started
+    enabled: yes
+
+- name: copy root env files
+  copy:
+    src: root/{{item}}
+    dest: /root
+    owner: root
+    group: root
+    mode: 0644
+  loop:
+    - '.bashrc'
+    - '.vimrc'
+
+- name: copy dkoleary env files
+  copy:
+    src: dkoleary/{{item}}
+    dest: /home/dkoleary
+    owner: dkoleary
+    group: dkoleary
+    mode: 0644
+  loop:
+    - '.bashrc'
+    - '.vimrc'
+
+- name: install and configure git
+  import_tasks: tasks/mkgit.yaml
+  when: mkgit
+
+- name: patch host
+  import_tasks: tasks/patchit.yaml
+  when: patchit
+
