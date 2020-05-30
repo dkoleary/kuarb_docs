@@ -1,20 +1,4 @@
 ---
-- name: Send kubernetes.repo
-  copy:
-    src: files/kubernetes.repo
-    dest: /etc/yum.repos.d/kubernetes.repo
-    owner: root
-    group: root
-    mode: '0644'
-
-- name: Install kubernetes
-  yum:
-    name: 
-      - kubelet
-      - kubeadm 
-      - kubectl
-    state: present
-
 - name: set permissive
   selinux:
     policy: targeted
@@ -35,6 +19,14 @@
 - name: disable swap
   command: /usr/sbin/swapoff -a
 
+- name: br_netfilter to get loaded on boot
+  copy:
+    src: files/br_netfiler.conf
+    dest: /etc/modules-load.d/br_netfiler.conf
+    owner: root
+    group: root
+    mode: '0644'
+
 - name: load br_netfilter module
   command: /usr/sbin/modprobe br_netfilter
 
@@ -50,3 +42,38 @@
     value: '1'
     state: present
 
+- name: Send repo files
+  copy:
+    src: files/{{item}}
+    dest: /etc/yum.repos.d/{{item}}
+    owner: root
+    group: root
+    mode: '0644'
+  loop:
+    - docker-ce.repo
+    - kubernetes.repo
+
+- name: Install kubernetes and docker
+  yum:
+    name: 
+      - containerd.io
+      - docker-ce
+      - docker-ce-cli
+      - kubeadm 
+      - kubectl
+      - kubelet
+    enablerepo: 
+      - docker-ce-stable
+      - kubernetes
+      - rhel-7-server-rhui-extras-rpms
+    state: present
+
+- name: enable services
+  service:
+    name: "{{item}}"
+    state: started
+    enabled: true
+  loop:
+    - docker
+    - kubelet
+      

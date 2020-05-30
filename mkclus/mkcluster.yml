@@ -1,0 +1,157 @@
+---
+- name: general set up for all kubenetes nodes
+  hosts: all
+  remote_user: root
+  gather_facts: no
+  tags:
+    - allnodes 
+
+  tasks:
+  - name: set permissive
+    selinux:
+      policy: targeted
+      state: permissive
+  
+  - name: ensure selinux stays that way
+    lineinfile:
+      path: /etc/selinux/config
+      regexp: '^SELINUX='
+      line: 'SELINUX=permissive'
+  
+  - name: remove swap from fstab
+    lineinfile:
+      path: /etc/fstab
+      regexp: '.*swap.*'
+      state: absent
+  
+  - name: disable swap
+    command: /usr/sbin/swapoff -a
+  
+  - name: br_netfilter to get loaded on boot
+    copy:
+      src: files/br_netfiler.conf
+      dest: /etc/modules-load.d/br_netfiler.conf
+      owner: root
+      group: root
+      mode: '0644'
+  
+  - name: load br_netfilter module
+    command: /usr/sbin/modprobe br_netfilter
+  
+  - name: set ipv4 bridge
+    sysctl:
+      name: net.bridge.bridge-nf-call-iptables
+      value: '1'
+      state: present
+  
+  - name: set ipv6 bridge
+    sysctl:
+      name: net.bridge.bridge-nf-call-ip6tables
+      value: '1'
+      state: present
+  
+  - name: Send repo files
+    copy:
+      src: files/{{item}}
+      dest: /etc/yum.repos.d/{{item}}
+      owner: root
+      group: root
+      mode: '0644'
+    loop:
+      - docker-ce.repo
+      - kubernetes.repo
+  
+  - name: Install kubernetes and docker
+    yum:
+      name: 
+        - containerd.io
+        - docker-ce
+        - docker-ce-cli
+        - kubeadm 
+        - kubectl
+        - kubelet
+      enablerepo: 
+        - docker-ce-stable
+        - kubernetes
+        - rhel-7-server-rhui-extras-rpms
+      state: present
+  
+  - name: enable services
+    service:
+      name: "{{item}}"
+      state: started
+      enabled: true
+    loop:
+      - docker
+      - kubelet
+
+  - name: create home/.kube
+    file:
+      path: /home/dkoleary/.kube
+      state: directory
+      owner: dkoleary
+      group: dkoleary
+
+- name: configure master
+  hosts: master
+  gather_facts: no
+  remote_user: root
+  tags:
+    - master
+
+  tasks:
+  - name: configure master firewall - 6443/tcp
+    firewalld:
+      port: 6443/tcp
+      permanent: yes
+      state: enabled
+
+  - name: configure master firewall - 2379-2380
+    firewalld:
+      port: 2379-2380/tcp
+      permanent: yes
+      state: enabled
+
+  - name: configure master firewall - 10250/tcp
+    firewalld:
+      port: 10250/tcp
+      permanent: yes
+      state: enabled
+    
+  - name: configure master firewall - 10251/tcp
+    firewalld:
+      port: 10251/tcp
+      permanent: yes
+      state: enabled
+    
+  - name: configure master firewall - 10252/tcp
+    firewalld:
+      port: 10252/tcp
+      permanent: yes
+      state: enabled
+    
+  - name: configure master firewall - 10255/tcp
+    firewalld:
+      port: 10255/tcp
+      permanent: yes
+      state: enabled
+    
+- name: configure workers
+  hosts: workers
+  gather_facts: no
+  remote_user: root
+  tags:
+    - workers
+
+  tasks:
+  - name: configure master firewall - 10251/tcp
+    firewalld:
+      port: 10251/tcp
+      permanent: yes
+      state: enabled
+    
+  - name: configure master firewall - 10255/tcp
+    firewalld:
+      port: 10255/tcp
+      permanent: yes
+      state: enabled

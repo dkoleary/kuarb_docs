@@ -1,0 +1,20 @@
+---
+- name: test yum_repository
+  hosts: all
+  gather_facts: no
+  tasks:
+
+  - name: install packages
+    yum:
+      name:
+        - containerd.io
+        - docker-ce
+        - docker-ce-cli
+        - kubeadm 
+        - kubectl
+        - kubelet
+      enablerepo: 
+        - docker-ce-stable
+        - kubernetes
+        - rhel-7-server-rhui-extras-rpms
+      state: present

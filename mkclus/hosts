@@ -1,4 +1,8 @@
-# master
-# worker1
-# worker2
-# worker3
+[master]
+18.224.202.97
+
+[workers]
+18.218.10.89
+52.14.19.221
+13.58.224.198
+

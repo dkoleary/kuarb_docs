@@ -1,0 +1,49 @@
+#!/bin/bash
+
+
+list_instances()
+{
+  aws ec2 describe-instances --query \
+    'Reservations[*].Instances[*].[InstanceId,State.Name,PublicIpAddress,PublicDnsName]' \
+    --output text
+}
+
+ts=( master worker1 worker2 worker3 )
+
+# echo "Hosts:"
+# echo "======"
+x=0
+list_instances | grep -v terminated | awk '{print $3, $NF}' | while read i h
+do
+  printf "%-13s %-7s %s\n" ${i} ${ts[${x}]} ${h}
+  x=$((x+1))
+done
+echo ''
+# echo "ssh config:"
+# echo "==========="
+
+x=0; 
+list_instances | grep -v terminated | awk '{print $3}' | while read i
+do
+cat << eof
+host ${ts[${x}]}
+  hostname ${i}
+  user root
+eof
+  x=$((x+1))
+done
+echo ''
+
+# echo "ansible inventory:"
+# echo "=================="
+
+
+x=0
+list_instances | grep -v terminated | awk '{print $3}' | while read i
+do
+  cat << eof
+[${ts[${x}]}]
+${i}
+
+eof
+done
